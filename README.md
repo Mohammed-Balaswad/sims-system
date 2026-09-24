@@ -17,8 +17,9 @@ This repository is structured as a **Monorepo** to house both the backend API an
 
 ## 🎨 UI/UX Design
 
+## 🎨 UI/UX Design
 The complete user interface wireframes, component systems, and interactive prototypes for this system were meticulously designed and planned prior to development. You can inspect the design workflow and prototypes here:
-- [🔗 SIMS Figma Design System & Prototypes](https://www.figma.com/proto/eiDsEX7xILcmENFIM6wXNo/Mohammed-system--Community-?node-id=1-4&t=RUNMWjrvjDRqPJJk-1)
+- [🔗 SIMS Figma Design System & Prototypes](https://www.figma.com/proto/eiDsEX7xILcmENFIM6wXNo/Mohammed-system--Community-?node-id=1-4&t=RUNMWjrvjDRqPJJk-1) *(Tip: Hold `Ctrl` or `Cmd` while clicking to open in a new tab)*
 ---
 
 ## 🎯 Purpose & Scope
