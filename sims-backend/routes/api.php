@@ -1,0 +1,145 @@
+<?php
+
+use App\Http\Controllers\AcademicYearController;
+use App\Http\Controllers\ActivityLogController;
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CertificateReplacementController;
+use App\Http\Controllers\Dashboard\DashboardController;
+use App\Http\Controllers\FinalResultController;
+use App\Http\Controllers\GradeController;
+use App\Http\Controllers\RoleController;
+use App\Http\Controllers\SchoolClassController;
+use App\Http\Controllers\SchoolController;
+use App\Http\Controllers\StudentController;
+use App\Http\Controllers\SubjectController;
+use App\Http\Controllers\FinalResultImportController;
+use App\Http\Controllers\StudentsDataImportController;
+use App\Http\Controllers\PdfExportController;
+use App\Http\Controllers\SuspendedStudentController;
+use App\Http\Controllers\TransferAdmissionController;
+use App\Http\Controllers\UserController;
+use App\Http\Controllers\LevelController;
+use App\Http\Controllers\StudentsDataExportController;
+use App\Http\Controllers\ErrorController;
+use App\Http\Controllers\FinalResultExportController;
+use App\Http\Controllers\ReportsController;
+use App\Http\Controllers\GlobalSearchController;
+
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
+
+Route::get('/user', function (Request $request) {
+    $user = $request->user()->load('roles');
+    // Append all permissions (direct + via roles) so the frontend can check them
+    $user->permissions_list = $user->getAllPermissions()->pluck('name')->values();
+    return $user;
+})->middleware('auth:sanctum');
+
+// Route::get('/export/final-result', [FinalResultController::class, 'export'])
+//     ->name('final-result.export');
+
+Route::post('/login', [AuthController::class, 'login'])->name('login');
+
+Route::group(['middleware' => ['auth:sanctum']], function () {
+    Route::group(['middleware' => ['must_change_password']], function () {
+        /**
+         * @authenticated
+         */
+        // users routes
+        Route::apiResource('/users', UserController::class);
+        // roles routes
+        Route::get('/permissions', [RoleController::class, 'permissions']);
+        Route::apiResource('/roles', RoleController::class);
+        // academic year routes
+        Route::apiResource('/academic-years', AcademicYearController::class);
+        // levels route
+        Route::get('/levels', [LevelController::class, 'index']);
+        // schools routes
+        Route::apiResource('/schools', SchoolController::class);
+        // subjects routes
+        Route::apiResource('/subjects', SubjectController::class);
+        // school classes routes
+        Route::apiResource('/school-classes', SchoolClassController::class);
+        // grades routes — محمية: لا يمكن إضافة/تعديل درجة لطالب موقوف
+        Route::post('/grades/bulk', [GradeController::class, 'bulkStore'])
+            ->middleware(['student.not_suspended']);
+        Route::delete('/grades/bulk/{studentId}/{academicYearId}', [GradeController::class, 'bulkDestroy'])
+            ->middleware(['student.not_suspended']);
+        Route::apiResource('/grades', GradeController::class)
+            ->middleware(['student.not_suspended']);
+
+        // Import endpoints
+        Route::get('/import/final-result', [FinalResultImportController::class, 'showImportForm']);
+        Route::post('/import/final-result', [FinalResultImportController::class, 'importImproved']);
+        
+        Route::get('/students/import', [StudentsDataImportController::class, 'importForm']);
+        Route::post('/students/import', [StudentsDataImportController::class, 'import']);
+
+        // Export endpoints
+        Route::get('/students/export/form', [StudentsDataExportController::class, 'exportForm']);
+        Route::post('/students/export', [StudentsDataExportController::class, 'export_students_data']);
+        Route::get('/export/final-result', [FinalResultExportController::class, 'exportFinalResults']);
+
+        // students route
+        Route::apiResource('/students', StudentController::class);
+
+        // final results route
+        Route::get('/final-results', [FinalResultController::class, 'index']);
+
+        // certificate replacements — محمية
+        Route::apiResource('/certificate-replacements', CertificateReplacementController::class)
+            ->only(['store', 'update'])
+            ->middleware(['student.not_suspended']);
+        Route::apiResource('/certificate-replacements', CertificateReplacementController::class)
+            ->except(['store', 'update']);
+
+        // transfers admissions — محمية: store و update
+        Route::apiResource('/transfers-admissions', TransferAdmissionController::class)->except('store');
+        Route::post('/transfers', [TransferAdmissionController::class, 'storeTransfer'])
+            ->middleware(['student.not_suspended']);
+        Route::post('/admissions', [TransferAdmissionController::class, 'storeAdmission'])
+            ->middleware(['student.not_suspended']);
+        Route::post('/register-student-out-region', [TransferAdmissionController::class, 'registerStudentOutRegion'])
+            ->middleware(['student.not_suspended']);
+
+        // ===== PDF Export Routes =====
+        Route::prefix('pdf')->middleware('cacheResponse:86400')->group(function () {
+            Route::get('/certificate-replacement/{id}', [PdfExportController::class, 'certificateReplacement'])->name('pdf.certificate');
+            Route::get('/transfer/{id}',                [PdfExportController::class, 'transfer'])->name('pdf.transfer');
+            Route::get('/admission/{id}',               [PdfExportController::class, 'admission'])->name('pdf.admission');
+            Route::get('/final-result/{id}',            [PdfExportController::class, 'finalResult'])->name('pdf.finalResult');
+            Route::get('/final-result/student/{studentId}/year/{yearId}', [PdfExportController::class, 'finalResultByStudent'])->name('pdf.finalResultByStudent');
+        });
+        // ===== Suspended Students (انتهاء القبول المؤقت) =====
+        Route::get('/suspended-students', [SuspendedStudentController::class, 'index'])->name('suspended-students.index');
+        Route::post('/suspended-students/{studentId}/restore', [SuspendedStudentController::class, 'restore'])->name('suspended-students.restore');
+
+        Route::get('/dashboard', [DashboardController::class, 'index']);
+
+        // errors routes
+        Route::apiResource('/errors', ErrorController::class);
+        Route::post('/errors/export', [ErrorController::class, 'exportStudentErrors']);
+
+        // Reports Routes (cached)
+        Route::prefix('reports')->middleware('cacheResponse:300')->group(function () {
+            Route::get('/students', [ReportsController::class, 'studentsReport']);
+            Route::get('/schools', [ReportsController::class, 'schoolsReport']);
+            Route::get('/transfers', [ReportsController::class, 'transfersAdmissionsReport']);
+            Route::get('/results', [ReportsController::class, 'finalResultsReport']);
+        });
+
+        // Comprehensive PDF export (NOT cached — always fresh)
+        Route::get('/reports/pdf/comprehensive', [ReportsController::class, 'comprehensivePdfReport']);
+
+        // Global Search Route
+        Route::get('/search', [GlobalSearchController::class, 'search']);
+
+        // Activity Logs Routes
+        Route::get('/activity-logs', [ActivityLogController::class, 'index']);
+        Route::get('/my-activity-logs', [ActivityLogController::class, 'myLogs']);
+
+    });
+
+    Route::post('/change-password', [AuthController::class, 'changePassword'])->name('change-password');
+    Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+});

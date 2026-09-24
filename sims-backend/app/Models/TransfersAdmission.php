@@ -1,0 +1,35 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class TransfersAdmission extends Model
+{
+    protected $guarded = [];
+
+    public function student() {
+        return $this->belongsTo(Student::class);
+    }
+
+    public function fromSchool() {
+        return $this->belongsTo(School::class, 'from_school_id');
+    }
+
+    public function toSchool() {
+        return $this->belongsTo(School::class, 'to_school_id');
+    }
+
+    public function schoolClass() {
+        return $this->belongsTo(SchoolClass::class, 'class_id');
+    }
+
+    public function academicYear() {
+        return $this->belongsTo(AcademicYear::class);
+    }
+
+    public function createdByUser()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+}

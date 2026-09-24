@@ -1,0 +1,42 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+/**
+ * @method \Illuminate\Database\Eloquent\Relations\HasMany subjects()
+ * @method \Illuminate\Database\Eloquent\Relations\HasMany students()
+ * @method \Illuminate\Database\Eloquent\Relations\HasMany enrollments()
+ */
+class SchoolClass extends Model
+{
+    use HasFactory;
+    protected $guarded = [];
+
+    public function students()
+    {
+        return $this->hasManyThrough(Student::class, StudentEnrollment::class, 'class_id', 'id', 'id', 'student_id');
+    }
+
+    public function level()
+    {
+        return $this->belongsTo(Level::class);
+    }
+
+    public function subjects()
+    {
+        return $this->belongsToMany(Subject::class, 'subject_school_class');
+    }
+
+    public function enrollments()
+    {
+        return $this->hasMany(StudentEnrollment::class);
+    }
+
+    public function certificateReplacements()
+    {
+        return $this->hasMany(CertificateReplacement::class);
+    }
+}

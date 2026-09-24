@@ -1,0 +1,73 @@
+<?php
+
+namespace App\Services\UserServices;
+
+use App\Models\User;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+
+class UserService
+{
+    use AuthorizesRequests;
+    public function getUsers()
+    {
+        $this->authorize('viewAny', User::class);
+        $users = User::with('roles')->get();
+        return $users;
+    }
+
+    public function createUser($validate)
+    {
+        $this->authorize('create', User::class);
+        $user = User::create([
+            'name' => $validate['name'],
+            'email' => $validate['email'],
+            'password' => Hash::make($validate['password']),
+            ]);
+    
+            if(!empty($validate['roles']))
+            {
+                $user->assignRole($validate['roles']);
+            }
+        return $user->load('roles');
+    }
+
+    public function getUserById(string $id)
+    {
+        $user = User::with('roles')->findOrFail($id);
+        $this->authorize('view', $user);
+        return $user;
+    }
+
+    public function editUser(Request $request, $validate, string $id)
+    {
+        $user = User::with('roles')->findOrFail($id);
+        $this->authorize('update', $user);
+
+        $updateData = [
+            'name' => $validate['name'],
+            'email' => $validate['email'],
+        ];
+
+        if (!empty($validate['password'])) {
+            $updateData['password'] = Hash::make($validate['password']);
+        }
+
+        $user->update($updateData);
+
+        if (isset($validate['roles'])) {
+            $user->syncRoles($validate['roles']);
+        }
+        
+        return $user->load('roles');
+    }
+
+    public function deleteUser(string $id)
+    {
+        $user = User::findOrFail($id);
+        $this->authorize('delete', $user);
+        $user->delete();
+        return $user;
+    }
+}
